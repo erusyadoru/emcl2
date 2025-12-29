@@ -99,6 +99,17 @@ std::shared_ptr<LikelihoodFieldMap> EMcl2Node::initMap(void)
 	int num;
 	private_nh_.param("num_particles", num, 0);
 
+	// Intensity map parameters
+	std::string intensity_map_path;
+	double geo_weight, intensity_weight, intensity_sigma;
+	double intensity_min_raw, intensity_max_raw;
+	private_nh_.param("intensity_map_path", intensity_map_path, std::string(""));
+	private_nh_.param("geo_weight", geo_weight, 1.0);
+	private_nh_.param("intensity_weight", intensity_weight, 0.5);
+	private_nh_.param("intensity_sigma", intensity_sigma, 30.0);
+	private_nh_.param("intensity_min_raw", intensity_min_raw, 0.0);
+	private_nh_.param("intensity_max_raw", intensity_max_raw, 20000.0);
+
 	nav_msgs::GetMap::Request req;
 	nav_msgs::GetMap::Response resp;
 	ROS_INFO("Requesting the map...");
@@ -108,7 +119,18 @@ std::shared_ptr<LikelihoodFieldMap> EMcl2Node::initMap(void)
 		d.sleep();
 	}
 
-	return std::shared_ptr<LikelihoodFieldMap>(new LikelihoodFieldMap(resp.map, likelihood_range));
+	// Use IntensityLikelihoodFieldMap if intensity map is specified
+	if(!intensity_map_path.empty()){
+		ROS_INFO("Using IntensityLikelihoodFieldMap with intensity map: %s", intensity_map_path.c_str());
+		return std::shared_ptr<LikelihoodFieldMap>(
+			new IntensityLikelihoodFieldMap(resp.map, likelihood_range,
+			                                intensity_map_path, geo_weight,
+			                                intensity_weight, intensity_sigma,
+			                                intensity_min_raw, intensity_max_raw));
+	} else {
+		ROS_INFO("Using standard LikelihoodFieldMap (no intensity)");
+		return std::shared_ptr<LikelihoodFieldMap>(new LikelihoodFieldMap(resp.map, likelihood_range));
+	}
 }
 
 void EMcl2Node::cbScan(const sensor_msgs::LaserScan::ConstPtr &msg)
@@ -207,6 +229,9 @@ void EMcl2Node::publishPose(double x, double y, double t,
 
 void EMcl2Node::publishOdomFrame(double x, double y, double t)
 {
+	static int tf_publish_count = 0;
+	bool should_debug = (tf_publish_count++ % 100 == 0);
+
 	geometry_msgs::PoseStamped odom_to_map;
 	try{
 		tf2::Quaternion q;
@@ -215,14 +240,19 @@ void EMcl2Node::publishOdomFrame(double x, double y, double t)
 
 		geometry_msgs::PoseStamped tmp_tf_stamped;
 		tmp_tf_stamped.header.frame_id = footprint_frame_id_;
-		tmp_tf_stamped.header.stamp = scan_time_stamp_;
+		tmp_tf_stamped.header.stamp = ros::Time(0);  // Use latest available transform
 		tf2::toMsg(tmp_tf.inverse(), tmp_tf_stamped.pose);
 
 		tf_->transform(tmp_tf_stamped, odom_to_map, odom_frame_id_);
 
-	}catch(tf2::TransformException){
-		ROS_DEBUG("Failed to subtract base to odom transform");
+	}catch(tf2::TransformException e){
+		if(should_debug){
+			ROS_WARN("Failed to publish map->odom TF: %s", e.what());
+		}
 		return;
+	}
+	if(should_debug){
+		ROS_INFO("DEBUG TF: Publishing map->odom, pose=(%.2f,%.2f,%.2f)", x, y, t);
 	}
 	tf2::convert(odom_to_map.pose, latest_tf_);
 

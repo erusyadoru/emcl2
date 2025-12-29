@@ -24,6 +24,9 @@ Scan& Scan::operator=(const Scan &s)
 	ranges_.clear();
 	copy(s.ranges_.begin(), s.ranges_.end(), back_inserter(ranges_) );
 
+	intensities_.clear();
+	copy(s.intensities_.begin(), s.intensities_.end(), back_inserter(intensities_) );
+
 	return *this;
 }
 

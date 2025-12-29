@@ -6,6 +6,7 @@
 
 #include <ros/ros.h>
 #include "emcl/ExpResetMcl2.h"
+#include "emcl/IntensityLikelihoodFieldMap.h"
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>

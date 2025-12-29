@@ -215,9 +215,17 @@ void Mcl::setScan(const sensor_msgs::LaserScan::ConstPtr &msg)
 	if(msg->ranges.size() != scan_.ranges_.size())
 		scan_.ranges_.resize(msg->ranges.size());
 
+	// Resize intensities if needed
+	if(msg->intensities.size() != scan_.intensities_.size())
+		scan_.intensities_.resize(msg->intensities.size());
+
 	scan_.seq_ = msg->header.seq;
 	for(int i=0; i<msg->ranges.size(); i++)
 		scan_.ranges_[i] = msg->ranges[i];
+
+	// Copy intensities
+	for(int i=0; i<msg->intensities.size(); i++)
+		scan_.intensities_[i] = msg->intensities[i];
 
 	scan_.angle_min_ = msg->angle_min;
 	scan_.angle_max_ = msg->angle_max;

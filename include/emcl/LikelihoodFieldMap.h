@@ -16,10 +16,16 @@ class LikelihoodFieldMap
 {
 public:
 	LikelihoodFieldMap(const nav_msgs::OccupancyGrid &map, double likelihood_range);
-	~LikelihoodFieldMap();
+	virtual ~LikelihoodFieldMap();
 
 	void setLikelihood(int x, int y, double range);
 	double likelihood(double x, double y);
+
+	// Virtual method for intensity-aware likelihood (overridden by IntensityLikelihoodFieldMap)
+	virtual double likelihood(double x, double y, float observed_intensity);
+
+	// Check if this map supports intensity
+	virtual bool hasIntensity() const { return false; }
 
 	std::vector<double *> likelihoods_;
 	int width_;

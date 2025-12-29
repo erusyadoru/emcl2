@@ -23,9 +23,10 @@ add_library(OdomModel_emcl2 src/OdomModel.cpp)
 add_library(Pose_emcl2 src/Pose.cpp)
 add_library(Scan_emcl2 src/Scan.cpp)
 add_library(LikelihoodFieldMap_emcl2 src/LikelihoodFieldMap.cpp)
+add_library(IntensityLikelihoodFieldMap_emcl2 src/IntensityLikelihoodFieldMap.cpp)
 
 add_executable(emcl2_node src/emcl2_node.cpp)
 
 add_dependencies(emcl2_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-target_link_libraries(emcl2_node Mcl_emcl2 ExpResetMcl2_emcl2 Particle_emcl2 Pose_emcl2 Scan_emcl2 OdomModel_emcl2 LikelihoodFieldMap_emcl2 ${catkin_LIBRARIES})
+target_link_libraries(emcl2_node Mcl_emcl2 ExpResetMcl2_emcl2 Particle_emcl2 Pose_emcl2 Scan_emcl2 OdomModel_emcl2 LikelihoodFieldMap_emcl2 IntensityLikelihoodFieldMap_emcl2 ${catkin_LIBRARIES})

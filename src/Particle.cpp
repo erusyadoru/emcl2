@@ -4,6 +4,7 @@
 
 #include "emcl/Particle.h"
 #include "emcl/Mcl.h"
+#include <ros/ros.h>
 #include <cmath>
 
 namespace emcl2 {
@@ -17,6 +18,9 @@ Particle::Particle(double x, double y, double t, double w) : p_(x, y, t)
 
 double Particle::likelihood(LikelihoodFieldMap *map, Scan &scan)
 {
+	static int debug_counter = 0;
+	bool should_debug = (debug_counter++ % 500 == 0);  // Debug every 500th call
+
 	uint16_t t = p_.get16bitRepresentation();
 	double lidar_x = p_.x_ + scan.lidar_pose_x_*Mcl::cos_[t]
 				- scan.lidar_pose_y_*Mcl::sin_[t];
@@ -25,15 +29,43 @@ double Particle::likelihood(LikelihoodFieldMap *map, Scan &scan)
 	uint16_t lidar_yaw = Pose::get16bitRepresentation(scan.lidar_pose_yaw_);
 
 	double ans = 0.0;
+	int valid_count = 0;
+	int nonzero_likelihood_count = 0;
+	int out_of_bounds_count = 0;
+
+	// Check if we have intensity data
+	bool use_intensity = map->hasIntensity() && !scan.intensities_.empty();
+
 	for(int i=0;i<scan.ranges_.size();i+=scan.scan_increment_){
 		if(not scan.valid(scan.ranges_[i]))
 			continue;
+		valid_count++;
 		uint16_t a = scan.directions_16bit_[i] + t + lidar_yaw;
 		double lx = lidar_x + scan.ranges_[i] * Mcl::cos_[a];
 		double ly = lidar_y + scan.ranges_[i] * Mcl::sin_[a];
 
-		ans += map->likelihood(lx, ly);
+		double ll;
+		if(use_intensity && i < scan.intensities_.size()){
+			// Use intensity-aware likelihood
+			ll = map->likelihood(lx, ly, scan.intensities_[i]);
+		} else {
+			// Fallback to geometric-only likelihood
+			ll = map->likelihood(lx, ly);
+		}
+
+		if(ll < 0.0){
+			out_of_bounds_count++;
+			continue;  // Skip out-of-bounds points
+		}
+		if(ll > 0.0) nonzero_likelihood_count++;
+		ans += ll;
 	}
+
+	if(should_debug){
+		ROS_INFO("DEBUG likelihood: particle_pos=(%.2f,%.2f), valid_beams=%d, nonzero_ll=%d, out_of_bounds=%d, total_ll=%.4f, use_intensity=%d",
+			p_.x_, p_.y_, valid_count, nonzero_likelihood_count, out_of_bounds_count, ans, use_intensity ? 1 : 0);
+	}
+
 	return ans;
 }
 
@@ -93,16 +125,23 @@ bool Particle::isPenetrating(double ox, double oy, double range, uint16_t direct
 		LikelihoodFieldMap *map, double &hit_lx, double &hit_ly)
 {
 	bool hit = false;
+
 	for(double d=map->resolution_;d<range;d+=map->resolution_){
 		double lx = ox + d * Mcl::cos_[direction];
 		double ly = oy + d * Mcl::sin_[direction];
 
-		if((not hit) and map->likelihood(lx, ly) > 0.99){
+		double ll = map->likelihood(lx, ly);
+
+		// Skip out-of-bounds points (likelihood returns -1.0)
+		if(ll < 0.0)
+			continue;
+
+		if((not hit) and ll > 0.5){  // Relaxed threshold for wall detection
 			hit = true;
 			hit_lx = lx;
 			hit_ly = ly;
 		}
-		else if(hit and map->likelihood(lx, ly) == 0.0){ // openspace after hit
+		else if(hit and ll == 0.0){ // openspace after hit
 			return true; // penetration
 		}
 	}

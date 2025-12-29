@@ -87,6 +87,9 @@ void ExpResetMcl2::sensorUpdate(double lidar_x, double lidar_y, double lidar_t, 
 double ExpResetMcl2::nonPenetrationRate(int skip, LikelihoodFieldMap *map, Scan &scan)
 {
 	static uint16_t shift = 0;
+	static int debug_rate_counter = 0;
+	bool should_debug = (debug_rate_counter++ % 20 == 0);
+
 	int counter = 0;
 	int penetrating = 0;
 	for(int i=shift%skip; i<particles_.size(); i+=skip){
@@ -96,8 +99,12 @@ double ExpResetMcl2::nonPenetrationRate(int skip, LikelihoodFieldMap *map, Scan 
 	}
 	shift++;
 
-	std::cout << penetrating << " " << counter << std::endl;
-	return (double)(counter - penetrating) / counter;
+	double rate = (double)(counter - penetrating) / counter;
+	if(should_debug){
+		ROS_INFO("DEBUG nonPenetrationRate: penetrating=%d/%d, rate=%.3f, threshold=%.3f",
+			penetrating, counter, rate, range_threshold_);
+	}
+	return rate;
 }
 
 void ExpResetMcl2::expansionReset(void)

@@ -25,6 +25,7 @@ public:
 	double lidar_pose_yaw_;
 
 	std::vector<double> ranges_;
+	std::vector<float> intensities_;
 	std::vector<uint16_t> directions_16bit_;
 
 	Scan& operator=(const Scan &s);
